@@ -3,12 +3,14 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "nuxt build",
+		"build": "set CLOUDFLARE_ENV=production && nuxt build",
+		"build:staging": "set CLOUDFLARE_ENV=staging && nuxt build",
 		"dev": "nuxt dev",
 		"generate": "nuxt generate",
 		"preview": "pnpm run build && wrangler pages dev",
 		"postinstall": "nuxt prepare",
 		"deploy": "pnpm run build && wrangler pages deploy",
+		"deploy:staging": "pnpm run build:staging && wrangler pages deploy",
 		"cf-typegen": "wrangler types"
 	},
 	"dependencies": {
