@@ -32,5 +32,6 @@ export default defineNuxtConfig({
   dir: {
     layouts: './client/layouts',
     pages: './client/pages'
-  }
+  },
+  
 })

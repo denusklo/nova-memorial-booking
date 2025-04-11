@@ -13,6 +13,19 @@
                     <p class="text-xl text-amber-200 mb-8">让思念不再遥远</p>
                     <div class="w-24 h-1 bg-amber-500 mx-auto"></div>
                 </div>
+                
+                <!-- Booking Button -->
+                <div class="max-w-lg mx-auto mt-8 text-center">
+                    <NuxtLink to="/booking" class="inline-block px-8 py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-sm transition duration-300 transform hover:scale-105">
+                        <span class="flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            预约服务
+                        </span>
+                    </NuxtLink>
+                    <p class="text-gray-400 mt-2">在线预约我们的纪念服务</p>
+                </div>
             </div>
         </section>
 
@@ -150,6 +163,15 @@
                             </div>
                         </div>
 
+                        <!-- Booking CTA Card -->
+                        <div class="mt-10 border border-amber-600 bg-gray-800 p-6 rounded-sm">
+                            <h3 class="text-xl font-semibold mb-3 text-amber-400">在线预约服务</h3>
+                            <p class="text-gray-300 mb-4">为您和您的亲人预约追思服务，我们提供全方位的线上预约系统。</p>
+                            <NuxtLink to="/booking" class="block w-full py-3 bg-amber-600 hover:bg-amber-500 text-white text-center rounded-sm transition duration-300">
+                                立即预约
+                            </NuxtLink>
+                        </div>
+
                         <!-- Map Placeholder -->
                         <div class="mt-10 border border-gray-700 p-1">
                             <div class="bg-gray-800 h-64 flex items-center justify-center">
@@ -186,6 +208,7 @@
                                 <li>电话预约：拨打我们的服务热线400-XXX-XXXX</li>
                                 <li>网上预约：填写本页面的联系表单，选择"预约参观"</li>
                                 <li>直接访问：您也可以直接前来，我们的工作人员会为您提供导览服务</li>
+                                <li>在线预约：点击上方的"预约服务"按钮进行在线预约</li>
                             </ul>
                         </div>
                     </div>
