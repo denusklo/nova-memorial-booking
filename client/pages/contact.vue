@@ -16,7 +16,7 @@
                 
                 <!-- Booking Button -->
                 <div class="max-w-lg mx-auto mt-8 text-center">
-                    <NuxtLink to="/booking" class="inline-block px-8 py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-sm transition duration-300 transform hover:scale-105">
+                    <NuxtLink to="/bookings" class="inline-block px-8 py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-sm transition duration-300 transform hover:scale-105">
                         <span class="flex items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -167,7 +167,7 @@
                         <div class="mt-10 border border-amber-600 bg-gray-800 p-6 rounded-sm">
                             <h3 class="text-xl font-semibold mb-3 text-amber-400">在线预约服务</h3>
                             <p class="text-gray-300 mb-4">为您和您的亲人预约追思服务，我们提供全方位的线上预约系统。</p>
-                            <NuxtLink to="/booking" class="block w-full py-3 bg-amber-600 hover:bg-amber-500 text-white text-center rounded-sm transition duration-300">
+                            <NuxtLink to="/bookings" class="block w-full py-3 bg-amber-600 hover:bg-amber-500 text-white text-center rounded-sm transition duration-300">
                                 立即预约
                             </NuxtLink>
                         </div>
