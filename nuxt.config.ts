@@ -5,7 +5,7 @@ export default defineNuxtConfig({
   modules: [
     "nitro-cloudflare-dev",
     '@nuxtjs/supabase',
-    '@nuxtjs/tailwindcss'
+    '@nuxtjs/tailwindcss',
   ],
 
   nitro: {

@@ -290,14 +290,29 @@
                                 placeholder="如有特殊要求，请在此说明"></textarea>
                         </div>
 
+                        <!-- Add this inside the Step 3 section, before the Submit button -->
+                        <div class="mt-6 mb-6">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="checkbox" v-model="addToGoogleCalendar"
+                                    class="form-checkbox h-5 w-5 text-amber-600 border-gray-300 rounded focus:ring-amber-500">
+                                <span class="ml-2 text-white">将预约添加到 Google 日历</span>
+                            </label>
+                            <p v-if="addToGoogleCalendar && !hasGoogleIntegration" class="text-gray-400 text-sm mt-1">
+                                您需要授权我们访问您的 Google 日历</p>
+                            <p v-else-if="addToGoogleCalendar && hasGoogleIntegration"
+                                class="text-gray-400 text-sm mt-1">已连接 Google 日历</p>
+                        </div>
+
                         <div class="flex justify-between mt-8">
                             <button @click="prevStep"
                                 class="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-sm transition-colors">
                                 上一步
                             </button>
-                            <button @click="nextStep" :disabled="!isContactFormValid"
-                                :class="`px-6 py-3 rounded-sm transition-colors ${!isContactFormValid ? 'bg-gray-600 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500'}`">
-                                提交预约
+                            <button 
+                                @click="createBookingWithCalendar" 
+                                :disabled="!isContactFormValid || isSubmitting"
+                                :class="`px-6 py-3 rounded-sm transition-colors ${!isContactFormValid || isSubmitting ? 'bg-gray-600 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500'}`">
+                                {{ isSubmitting ? '提交中...' : '提交预约' }}
                             </button>
                         </div>
                     </div>
@@ -419,6 +434,9 @@ const bookingSuccess = ref(false)
 const bookingError = ref('')
 const bookingReference = ref('')
 const isSubmitting = ref(false)
+
+const addToGoogleCalendar = ref(false)
+const hasGoogleIntegration = ref(false)
 
 // Computed properties
 const currentMonthName = computed(() => {
@@ -673,21 +691,21 @@ const nextStep = async () => {
     if (currentStep.value < steps.length - 1) {
         // If this is the final step before confirmation, create the booking
         if (currentStep.value === 2) {
-            await createBooking()
+            await createBookingWithCalendar()
         } else {
             currentStep.value++
         }
     }
 }
 
-const createBooking = async () => {
+const createBookingWithCalendar = async () => {
     try {
         isSubmitting.value = true
         bookingError.value = ''
-
+        
         // Format date (YYYY-MM-DD)
         const bookingDate = `${selectedDate.value.year}-${String(selectedDate.value.month + 1).padStart(2, '0')}-${String(selectedDate.value.date).padStart(2, '0')}`
-
+        
         const bookingData = {
             service_id: selectedService.value.id,
             booking_date: bookingDate,
@@ -696,7 +714,7 @@ const createBooking = async () => {
             notes: bookingInfo.value.notes,
             status: 'pending'
         }
-
+        
         // If user is logged in, add user_id
         if (user.value) {
             bookingData.user_id = user.value.id
@@ -706,7 +724,7 @@ const createBooking = async () => {
             bookingData.guest_email = bookingInfo.value.guestEmail
             bookingData.guest_phone = bookingInfo.value.guestPhone
         }
-
+        
         // Create booking using the stored procedure
         const { data, error } = await supabase.rpc('create_booking', {
             p_user_id: bookingData.user_id || null,
@@ -719,14 +737,51 @@ const createBooking = async () => {
             p_guest_phone: bookingData.guest_phone || null,
             p_notes: bookingData.notes || null
         })
-
+        
         if (error) throw error
-
+        
         // Store booking reference
         bookingReference.value = data
-
-        // TODO: Add Google Calendar integration here
-        // For now we'll just move to the next step
+        
+        // Handle Google Calendar integration if requested
+        if (addToGoogleCalendar.value) {
+            if (!hasGoogleIntegration.value) {
+                // Store booking ID in localStorage to use after auth
+                localStorage.setItem('pendingBookingId', data)
+                
+                // Start Google auth flow
+                const response = await fetch('/api/auth/google')
+                const result = await response.json()
+                
+                // Save current state to restore later
+                localStorage.setItem('bookingState', JSON.stringify({
+                    service: selectedService.value,
+                    date: selectedDate.value,
+                    timeSlot: selectedTimeSlot.value,
+                    bookingInfo: bookingInfo.value
+                }))
+                
+                // Redirect to Google auth
+                window.location.href = result.url
+                return // Stop here as we're redirecting
+            } else if (hasGoogleIntegration.value) {
+                // User already has Google integration, add directly to calendar
+                try {
+                    await fetch('/api/calendar/add-event', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ bookingId: data })
+                    })
+                } catch (calendarError) {
+                    console.error('Error adding to calendar:', calendarError)
+                    // Continue with booking flow even if calendar fails
+                }
+            }
+        }
+        
+        // Booking successful
         bookingSuccess.value = true
         currentStep.value++
     } catch (error) {
@@ -755,7 +810,64 @@ const resetForm = () => {
 }
 
 // Initialize
-onMounted(() => {
+// Add this to your onMounted function
+onMounted(async () => {
     fetchServices()
+    
+    // Check if returning from Google auth
+    const pendingBookingId = localStorage.getItem('pendingBookingId')
+    if (pendingBookingId) {
+        try {
+            // User is back from Google auth, add event to calendar
+            await fetch('/api/calendar/add-event', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ bookingId: pendingBookingId })
+            })
+            
+            // Clear localStorage
+            localStorage.removeItem('pendingBookingId')
+            
+            // Show success message or redirect to confirmation
+            bookingReference.value = pendingBookingId
+            bookingSuccess.value = true
+            currentStep.value = 3 // Confirmation step
+            
+            // Try to restore booking state for display purposes
+            try {
+                const savedState = JSON.parse(localStorage.getItem('bookingState'))
+                if (savedState) {
+                    selectedService.value = savedState.service
+                    selectedDate.value = savedState.date
+                    selectedTimeSlot.value = savedState.timeSlot
+                    localStorage.removeItem('bookingState')
+                }
+            } catch (e) {
+                console.error('Error restoring booking state:', e)
+            }
+        } catch (error) {
+            console.error('Error adding to calendar after auth:', error)
+        }
+    } else {
+        // Normal flow - fetch services
+        fetchServices()
+        
+        // Check if user has Google Calendar integration
+        if (user.value) {
+            try {
+                const { data, error } = await supabase
+                    .from('user_google_tokens')
+                    .select('user_id')
+                    .eq('user_id', user.value.id)
+                    .single()
+                
+                hasGoogleIntegration.value = !error && data
+            } catch (error) {
+                console.error('Error checking Google integration:', error)
+            }
+        }
+    }
 })
 </script>
