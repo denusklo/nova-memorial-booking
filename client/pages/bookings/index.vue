@@ -308,9 +308,7 @@
                                 class="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-sm transition-colors">
                                 上一步
                             </button>
-                            <button 
-                                @click="createBookingWithCalendar" 
-                                :disabled="!isContactFormValid || isSubmitting"
+                            <button @click="createBookingWithCalendar" :disabled="!isContactFormValid || isSubmitting"
                                 :class="`px-6 py-3 rounded-sm transition-colors ${!isContactFormValid || isSubmitting ? 'bg-gray-600 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500'}`">
                                 {{ isSubmitting ? '提交中...' : '提交预约' }}
                             </button>
@@ -343,7 +341,7 @@
                                     <div>
                                         <p class="text-gray-400 text-sm">预约时间</p>
                                         <p class="text-white">{{ formatDate(selectedDate) }} {{ selectedTimeSlot.start
-                                            }} - {{ selectedTimeSlot.end }}</p>
+                                        }} - {{ selectedTimeSlot.end }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -395,6 +393,8 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 // Supabase composables will be auto-imported by Nuxt
+import { useRouter } from 'vue-router'
+const router = useRouter()
 
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
@@ -698,14 +698,161 @@ const nextStep = async () => {
     }
 }
 
+const connectGoogleAndCreateEvent = async (bookingId) => {
+    try {
+        // Create a popup window for the Google auth
+        const width = 600;
+        const height = 600;
+        const left = window.innerWidth / 2 - width / 2;
+        const top = window.innerHeight / 2 - height / 2;
+
+        // First, get the Google auth URL
+        const response = await fetch('/api/auth/google');
+        const result = await response.json();
+
+        // Store booking info for later use
+        localStorage.setItem('pendingBookingId', bookingId);
+        localStorage.setItem('bookingState', JSON.stringify({
+            service: selectedService.value,
+            date: selectedDate.value,
+            timeSlot: selectedTimeSlot.value,
+            bookingInfo: bookingInfo.value
+        }));
+
+        // Open auth in popup window
+        const authWindow = window.open(
+            result.url,
+            'googleAuthWindow',
+            `width=${width},height=${height},left=${left},top=${top}`
+        );
+
+        // Poll for completion - we'll set up a message listener to know when auth is done
+        window.addEventListener('message', async (event) => {
+            // Make sure it's our message from the popup
+            // Inside the message event listener where you process Google auth success
+            if (event.data && event.data.type === 'google-auth-success') {
+                // Close the popup
+                if (authWindow) authWindow.close();
+
+                const { accessToken, refreshToken, expiryDate } = event.data;
+
+                // Log the current user
+                console.log('Current user:', user.value);
+
+                // Save tokens to database if needed
+                if (user.value) {
+                    // Your existing code to save tokens...
+                }
+
+                // Add event to calendar - UPDATED to send tokens
+                // Updated part of the Google auth success handler
+
+                // Add event to calendar - Send all necessary data
+                try {
+                    console.log('Sending request to add event to calendar with tokens and details');
+                    const calendarResponse = await fetch('/api/calendar/add-event', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            bookingId,
+                            accessToken,
+                            refreshToken,
+                            expiryDate,
+                            bookingDetails: { // Define the booking details object
+                                service: selectedService.value,
+                                date: selectedDate.value,
+                                timeSlot: selectedTimeSlot.value,
+                                bookingInfo: bookingInfo.value
+                            }
+                        })
+                    });
+
+                    const calendarResult = await calendarResponse.json();
+                    console.log('Calendar add event response:', calendarResult);
+
+                    // Check if calendar event was successfully created
+                    if (calendarResult.success && calendarResult.eventId) {
+                        // Update the booking in Supabase to mark it as added to calendar
+                        try {
+                            const updateResponse = await supabase
+                                .from('bookings')
+                                .update({
+                                    google_calendar_event_id: calendarResult.eventId,
+                                })
+                                .eq('id', bookingId);
+
+                            if (updateResponse.error) {
+                                console.error('Error updating booking:', updateResponse.error);
+                            } else {
+                                console.log('Successfully updated booking with calendar event ID');
+                            }
+                        } catch (updateError) {
+                            console.error('Failed to update booking with calendar event info:', updateError);
+                            // This is non-critical, so continue with the flow
+                        }
+
+                        // Store calendar status and event link for the confirmation page
+                        localStorage.setItem('calendarEventAdded', 'true');
+                        if (calendarResult.htmlLink) {
+                            localStorage.setItem('calendarEventLink', calendarResult.htmlLink);
+                        }
+
+                        // Add this redirection code here
+                        console.log('Redirecting to confirmation page...');
+                        
+                        // Clean up
+                        localStorage.removeItem('pendingBookingId');
+                        
+                        // Redirect to confirmation page
+                        router.push('/bookings/confirmation');
+                    } else {
+                        console.warn('Calendar event creation did not return success or event ID');
+                        localStorage.setItem('calendarEventAdded', 'false');
+
+                        // Still redirect to confirmation page even if calendar fails
+                        // router.push('/bookings/confirmation');
+                    }
+
+                    // Save tokens to database
+                    if (user.value) {
+                        try {
+                            await supabase
+                                .from('user_google_tokens')
+                                .upsert({
+                                    user_id: user.value.id,
+                                    access_token: accessToken,
+                                    refresh_token: refreshToken || null,
+                                    expiry_date: expiryDate ? new Date(Number(expiryDate)).toISOString() : null
+                                });
+                            console.log('Google tokens saved to database');
+                        } catch (dbError) {
+                            console.error('Error saving tokens:', dbError);
+                            // Non-critical error, continue with the flow
+                        }
+                    }
+                } catch (calendarError) {
+                    console.error('Failed to add event to calendar:', calendarError);
+                    localStorage.setItem('calendarEventAdded', 'false');
+                }
+            }
+        }, false);
+
+    } catch (error) {
+        console.error('Error connecting to Google:', error);
+        alert('Google Calendar 连接失败，请稍后再试');
+    }
+};
+
 const createBookingWithCalendar = async () => {
     try {
         isSubmitting.value = true
         bookingError.value = ''
-        
+
         // Format date (YYYY-MM-DD)
         const bookingDate = `${selectedDate.value.year}-${String(selectedDate.value.month + 1).padStart(2, '0')}-${String(selectedDate.value.date).padStart(2, '0')}`
-        
+
         const bookingData = {
             service_id: selectedService.value.id,
             booking_date: bookingDate,
@@ -714,7 +861,7 @@ const createBookingWithCalendar = async () => {
             notes: bookingInfo.value.notes,
             status: 'pending'
         }
-        
+
         // If user is logged in, add user_id
         if (user.value) {
             bookingData.user_id = user.value.id
@@ -724,7 +871,7 @@ const createBookingWithCalendar = async () => {
             bookingData.guest_email = bookingInfo.value.guestEmail
             bookingData.guest_phone = bookingInfo.value.guestPhone
         }
-        
+
         // Create booking using the stored procedure
         const { data, error } = await supabase.rpc('create_booking', {
             p_user_id: bookingData.user_id || null,
@@ -737,22 +884,22 @@ const createBookingWithCalendar = async () => {
             p_guest_phone: bookingData.guest_phone || null,
             p_notes: bookingData.notes || null
         })
-        
+
         if (error) throw error
-        
+
         // Store booking reference
         bookingReference.value = data
-        
+
         // Handle Google Calendar integration if requested
         if (addToGoogleCalendar.value) {
             if (!hasGoogleIntegration.value) {
                 // Store booking ID in localStorage to use after auth
                 localStorage.setItem('pendingBookingId', data)
-                
+
                 // Start Google auth flow
                 const response = await fetch('/api/auth/google')
                 const result = await response.json()
-                
+
                 // Save current state to restore later
                 localStorage.setItem('bookingState', JSON.stringify({
                     service: selectedService.value,
@@ -760,10 +907,10 @@ const createBookingWithCalendar = async () => {
                     timeSlot: selectedTimeSlot.value,
                     bookingInfo: bookingInfo.value
                 }))
-                
+
                 // Redirect to Google auth
-                window.location.href = result.url
-                return // Stop here as we're redirecting
+                await connectGoogleAndCreateEvent(data);
+                return; // Stop here while popup handles auth
             } else if (hasGoogleIntegration.value) {
                 // User already has Google integration, add directly to calendar
                 try {
@@ -780,7 +927,7 @@ const createBookingWithCalendar = async () => {
                 }
             }
         }
-        
+
         // Booking successful
         bookingSuccess.value = true
         currentStep.value++
@@ -813,7 +960,7 @@ const resetForm = () => {
 // Add this to your onMounted function
 onMounted(async () => {
     fetchServices()
-    
+
     // Check if returning from Google auth
     const pendingBookingId = localStorage.getItem('pendingBookingId')
     if (pendingBookingId) {
@@ -826,15 +973,15 @@ onMounted(async () => {
                 },
                 body: JSON.stringify({ bookingId: pendingBookingId })
             })
-            
+
             // Clear localStorage
             localStorage.removeItem('pendingBookingId')
-            
+
             // Show success message or redirect to confirmation
             bookingReference.value = pendingBookingId
             bookingSuccess.value = true
             currentStep.value = 3 // Confirmation step
-            
+
             // Try to restore booking state for display purposes
             try {
                 const savedState = JSON.parse(localStorage.getItem('bookingState'))
@@ -853,7 +1000,7 @@ onMounted(async () => {
     } else {
         // Normal flow - fetch services
         fetchServices()
-        
+
         // Check if user has Google Calendar integration
         if (user.value) {
             try {
@@ -862,7 +1009,7 @@ onMounted(async () => {
                     .select('user_id')
                     .eq('user_id', user.value.id)
                     .single()
-                
+
                 hasGoogleIntegration.value = !error && data
             } catch (error) {
                 console.error('Error checking Google integration:', error)

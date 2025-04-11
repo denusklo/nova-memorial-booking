@@ -2,96 +2,116 @@
 import { google } from 'googleapis'
 
 export default defineEventHandler(async (event) => {
-  const { bookingId } = await readBody(event)
-  const user = event.context.user // From your auth middleware
-
-  // Get booking details
-  const supabase = useSupabaseClient()
-  const { data: booking, error } = await supabase
-    .from('bookings')
-    .select(`
-      id, 
-      booking_date, 
-      start_time, 
-      end_time,
-      service:service_id(name, description)
-    `)
-    .eq('id', bookingId)
-    .single()
-
-  if (error || !booking) {
-    throw createError({
-      statusCode: 404,
-      message: 'Booking not found'
-    })
-  }
-
-  // Get user's Google tokens
-  const { data: tokens, error: tokensError } = await supabase
-    .from('user_google_tokens')
-    .select('access_token, refresh_token, expiry_date')
-    .eq('user_id', user.id)
-    .single()
-
-  if (tokensError || !tokens) {
-    throw createError({
-      statusCode: 403,
-      message: 'Google Calendar not connected'
-    })
-  }
-
-  // Set up OAuth client
-  const oauth2Client = new google.auth.OAuth2(
-    config.googleClientId,
-    config.googleClientSecret,
-    config.googleRedirectUri
-  )
-
-  oauth2Client.setCredentials({
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
-    expiry_date: new Date(tokens.expiry_date).getTime()
-  })
-
-  // Create calendar event
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
-
   try {
-    const event = {
-      summary: `预约: ${booking.service.name}`,
-      description: booking.service.description,
+    // Get Nuxt runtime config
+    const config = useRuntimeConfig()
+   
+    // Get the request body with booking details and tokens
+    const body = await readBody(event)
+    const { bookingId, accessToken, refreshToken, expiryDate, bookingDetails } = body
+   
+    if (!accessToken) {
+      throw createError({
+        statusCode: 400,
+        message: 'Missing Google access token'
+      })
+    }
+   
+    console.log('Processing calendar event with direct token approach')
+   
+    // Set up Google OAuth client with the provided tokens
+    const oauth2Client = new google.auth.OAuth2(
+      config.public.googleClientId,
+      config.googleClientSecret,
+      config.public.googleRedirectUri
+    )
+   
+    // Set credentials directly from the request
+    oauth2Client.setCredentials({
+      access_token: accessToken,
+      refresh_token: refreshToken || null,
+      expiry_date: expiryDate ? Number(expiryDate) : null
+    })
+   
+    // Create the calendar API client
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+   
+    // Extract booking details from the client data
+    const service = bookingDetails?.service?.name || '预约'
+    // These field names were incorrect - should match the actual request structure
+    const customerName = bookingDetails?.bookingInfo?.guestName || 'Customer'
+    const customerPhone = bookingDetails?.bookingInfo?.guestPhone || 'No phone'
+    const notes = bookingDetails?.bookingInfo?.notes || ''
+    
+    // Create a proper date object from the date components
+    const bookingDate = new Date(
+      bookingDetails.date.year, 
+      bookingDetails.date.month, 
+      bookingDetails.date.date
+    )
+    
+    // Get the time slot
+    const startTimeStr = bookingDetails?.timeSlot?.start || '12:00'
+    const endTimeStr = bookingDetails?.timeSlot?.end || '13:00'
+    
+    // Create proper start and end time Date objects
+    const startTime = new Date(bookingDate)
+    const [startHours, startMinutes] = startTimeStr.split(':').map(Number)
+    startTime.setHours(startHours, startMinutes, 0, 0)
+    
+    const endTime = new Date(bookingDate)
+    const [endHours, endMinutes] = endTimeStr.split(':').map(Number)
+    endTime.setHours(endHours, endMinutes, 0, 0)
+   
+    // Create the calendar event
+    const calendarEvent = {
+      summary: `${service} - ${customerName}`,
+      description: `预约详情:\n电话: ${customerPhone}\n备注: ${notes}`,
       start: {
-        dateTime: `${booking.booking_date}T${booking.start_time}:00+08:00`,
+        dateTime: startTime.toISOString(),
+        timeZone: 'Asia/Shanghai', // Adjust this to your timezone
       },
       end: {
-        dateTime: `${booking.booking_date}T${booking.end_time}:00+08:00`,
+        dateTime: endTime.toISOString(),
+        timeZone: 'Asia/Shanghai', // Adjust this to your timezone
       },
       reminders: {
-        useDefault: false,
-        overrides: [
-          { method: 'email', minutes: 24 * 60 },
-          { method: 'popup', minutes: 30 }
-        ]
+        useDefault: true,
+      },
+    }
+   
+    console.log('Creating calendar event:', calendarEvent)
+   
+    // Insert the event
+    const calendarResponse = await calendar.events.insert({
+      calendarId: 'primary', // Uses the user's primary calendar
+      resource: calendarEvent,
+    })
+   
+    console.log('Calendar event created:', calendarResponse.data)
+   
+    return {
+      success: true,
+      eventId: calendarResponse.data.id,
+      htmlLink: calendarResponse.data.htmlLink,
+      message: 'Event added to Google Calendar'
+    }
+  } catch (error) {
+    console.error('Error adding event to calendar:', error)
+   
+    // Handle token refresh errors or other Google API issues
+    if (error.response?.status === 401) {
+      return {
+        success: false,
+        needsReauth: true,
+        message: 'Authentication expired, needs to reconnect Google'
       }
     }
-
-    const response = await calendar.events.insert({
-      calendarId: 'primary',
-      resource: event,
-    })
-
-    // Update booking with calendar event ID
-    await supabase
-      .from('bookings')
-      .update({ google_calendar_event_id: response.data.id })
-      .eq('id', bookingId)
-
-    return { success: true, eventId: response.data.id }
-  } catch (error) {
-    console.error('Error creating calendar event:', error)
+   
     throw createError({
-      statusCode: 500,
-      message: 'Failed to create calendar event'
+      statusCode: error.statusCode || 500,
+      message: error.message || 'Failed to add event to calendar',
+      details: error.message
     })
   }
 })

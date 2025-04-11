@@ -2,6 +2,17 @@
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
+  runtimeConfig: {
+    // The private keys which are only available server-side
+    googleClientId: process.env.GOOGLE_CLIENT_ID,
+    googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    googleRedirectUri: process.env.GOOGLE_REDIRECT_URI,
+    
+    // Keys within public are also exposed client-side
+    public: {
+      // Public config here
+    }
+  },
   modules: [
     "nitro-cloudflare-dev",
     '@nuxtjs/supabase',
