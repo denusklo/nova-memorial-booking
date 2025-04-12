@@ -3,14 +3,14 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "set CLOUDFLARE_ENV=production && nuxt build",
-		"build:staging": "set CLOUDFLARE_ENV=staging && nuxt build",
+		"build": "cross-env NODE_OPTIONS='--max-old-space-size=8192' set CLOUDFLARE_ENV=production && nuxt build",
+		"build:staging": "cross-env NODE_OPTIONS='--max-old-space-size=8192' set CLOUDFLARE_ENV=staging && nuxt build",
 		"dev": "nuxt dev",
 		"generate": "nuxt generate",
-		"preview": "pnpm run build && wrangler pages dev",
+		"preview": "cross-env NODE_OPTIONS='--max-old-space-size=8192' pnpm run build && wrangler pages dev",
 		"postinstall": "nuxt prepare",
-		"deploy": "pnpm run build && wrangler pages deploy",
-		"deploy:staging": "pnpm run build:staging && wrangler pages deploy",
+		"deploy": "cross-env NODE_OPTIONS='--max-old-space-size=8192' pnpm run build && wrangler pages deploy",
+		"deploy:staging": "cross-env NODE_OPTIONS='--max-old-space-size=8192' pnpm run build:staging && wrangler pages deploy",
 		"cf-typegen": "wrangler types"
 	},
 	"dependencies": {
@@ -24,6 +24,7 @@
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20250410.0",
 		"@nuxtjs/tailwindcss": "^6.13.2",
+		"cross-env": "^7.0.3",
 		"h3": "^1.15.1",
 		"nitro-cloudflare-dev": "^0.2.2",
 		"wrangler": "^4.9.1"
