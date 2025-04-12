@@ -3,14 +3,14 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "cross-env NODE_OPTIONS='--max-old-space-size=8192' set CLOUDFLARE_ENV=production && nuxt build",
-		"build:staging": "cross-env NODE_OPTIONS='--max-old-space-size=8192' set CLOUDFLARE_ENV=staging && nuxt build",
+		"build": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=production nuxt build",
+		"build:staging": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=staging nuxt build",
 		"dev": "nuxt dev",
 		"generate": "nuxt generate",
-		"preview": "cross-env NODE_OPTIONS='--max-old-space-size=8192' pnpm run build && wrangler pages dev",
+		"preview": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=production nuxt build && wrangler pages dev",
 		"postinstall": "nuxt prepare",
-		"deploy": "cross-env NODE_OPTIONS='--max-old-space-size=8192' pnpm run build && wrangler pages deploy",
-		"deploy:staging": "cross-env NODE_OPTIONS='--max-old-space-size=8192' pnpm run build:staging && wrangler pages deploy",
+		"deploy": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=production nuxt build && wrangler pages deploy",
+		"deploy:staging": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=staging nuxt build && wrangler pages deploy",
 		"cf-typegen": "wrangler types"
 	},
 	"dependencies": {
