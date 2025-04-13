@@ -1,6 +1,4 @@
 // server/api/calendar/add-event.js
-import { google } from 'googleapis'
-
 export default defineEventHandler(async (event) => {
   try {
     // Get Nuxt runtime config
@@ -17,48 +15,30 @@ export default defineEventHandler(async (event) => {
       })
     }
    
-    console.log('Processing calendar event with direct token approach')
-   
-    // Set up Google OAuth client with the provided tokens
-    const oauth2Client = new google.auth.OAuth2(
-      config.public.googleClientId,
-      config.googleClientSecret,
-      config.public.googleRedirectUri
-    )
-   
-    // Set credentials directly from the request
-    oauth2Client.setCredentials({
-      access_token: accessToken,
-      refresh_token: refreshToken || null,
-      expiry_date: expiryDate ? Number(expiryDate) : null
-    })
-   
-    // Create the calendar API client
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+    console.log('Processing calendar event with fetch API')
    
     // Extract booking details from the client data
     const service = bookingDetails?.service?.name || '预约'
-    // These field names were incorrect - should match the actual request structure
     const customerName = bookingDetails?.bookingInfo?.guestName || 'Customer'
     const customerPhone = bookingDetails?.bookingInfo?.guestPhone || 'No phone'
     const notes = bookingDetails?.bookingInfo?.notes || ''
-    
+   
     // Create a proper date object from the date components
     const bookingDate = new Date(
-      bookingDetails.date.year, 
-      bookingDetails.date.month, 
+      bookingDetails.date.year,
+      bookingDetails.date.month,
       bookingDetails.date.date
     )
-    
+   
     // Get the time slot
     const startTimeStr = bookingDetails?.timeSlot?.start || '12:00'
     const endTimeStr = bookingDetails?.timeSlot?.end || '13:00'
-    
+   
     // Create proper start and end time Date objects
     const startTime = new Date(bookingDate)
     const [startHours, startMinutes] = startTimeStr.split(':').map(Number)
     startTime.setHours(startHours, startMinutes, 0, 0)
-    
+   
     const endTime = new Date(bookingDate)
     const [endHours, endMinutes] = endTimeStr.split(':').map(Number)
     endTime.setHours(endHours, endMinutes, 0, 0)
@@ -82,31 +62,50 @@ export default defineEventHandler(async (event) => {
    
     console.log('Creating calendar event:', calendarEvent)
    
-    // Insert the event
-    const calendarResponse = await calendar.events.insert({
-      calendarId: 'primary', // Uses the user's primary calendar
-      resource: calendarEvent,
-    })
-   
-    console.log('Calendar event created:', calendarResponse.data)
+    // Instead of using googleapis, use direct fetch call to the Google Calendar API
+    const calendarResponse = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(calendarEvent)
+    });
+    
+    // Handle non-OK responses
+    if (!calendarResponse.ok) {
+      const errorData = await calendarResponse.json();
+      
+      // Handle authentication errors (similar to before)
+      if (calendarResponse.status === 401) {
+        return {
+          success: false,
+          needsReauth: true,
+          message: 'Authentication expired, needs to reconnect Google'
+        }
+      }
+      
+      throw createError({
+        statusCode: calendarResponse.status,
+        message: errorData.error?.message || 'Google Calendar API error',
+        details: JSON.stringify(errorData)
+      });
+    }
+    
+    // Parse the successful response
+    const responseData = await calendarResponse.json();
+    
+    console.log('Calendar event created:', responseData);
    
     return {
       success: true,
-      eventId: calendarResponse.data.id,
-      htmlLink: calendarResponse.data.htmlLink,
+      eventId: responseData.id,
+      htmlLink: responseData.htmlLink,
       message: 'Event added to Google Calendar'
     }
   } catch (error) {
     console.error('Error adding event to calendar:', error)
-   
-    // Handle token refresh errors or other Google API issues
-    if (error.response?.status === 401) {
-      return {
-        success: false,
-        needsReauth: true,
-        message: 'Authentication expired, needs to reconnect Google'
-      }
-    }
    
     throw createError({
       statusCode: error.statusCode || 500,

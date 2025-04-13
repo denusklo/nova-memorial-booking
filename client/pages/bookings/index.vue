@@ -394,6 +394,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 // Supabase composables will be auto-imported by Nuxt
 import { useRouter } from 'vue-router'
+
 const router = useRouter()
 
 const supabase = useSupabaseClient()

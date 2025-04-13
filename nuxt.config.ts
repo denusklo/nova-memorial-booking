@@ -26,6 +26,14 @@ export default defineNuxtConfig({
     cloudflare: {
       deployConfig: true,
       nodeCompat: true
+    },
+    externals: {
+      inline: ['google-auth-library'],
+    },
+    rollupConfig: {
+      output: {
+        format: 'es'
+      }
     }
   },
   supabase: {

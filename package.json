@@ -1,32 +1,38 @@
 {
-	"name": "nova-memorial-booking",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"build": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=production nuxt build",
-		"build:staging": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=staging nuxt build",
-		"dev": "nuxt dev",
-		"generate": "nuxt generate",
-		"preview": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=production nuxt build && wrangler pages dev",
-		"postinstall": "nuxt prepare",
-		"deploy": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=production nuxt build && wrangler pages deploy",
-		"deploy:staging": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=staging nuxt build && wrangler pages deploy",
-		"cf-typegen": "wrangler types"
-	},
-	"dependencies": {
-		"@nuxtjs/supabase": "^1.5.0",
-		"@supabase/supabase-js": "^2.49.4",
-		"googleapis": "^148.0.0",
-		"nuxt": "^3.16.2",
-		"vue": "^3.5.13",
-		"vue-router": "^4.5.0"
-	},
-	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20250410.0",
-		"@nuxtjs/tailwindcss": "^6.13.2",
-		"cross-env": "^7.0.3",
-		"h3": "^1.15.1",
-		"nitro-cloudflare-dev": "^0.2.2",
-		"wrangler": "^4.9.1"
-	}
+    "name": "nova-memorial-booking",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=production nuxt build",
+        "build:staging": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=staging nuxt build",
+        "build:dev": "cross-env NODE_OPTIONS='--max-old-space-size=8192' NODE_ENV=development CLOUDFLARE_ENV=development nuxt build --debug --verbose",
+        "dev": "nuxt dev",
+        "generate": "nuxt generate",
+        "preview": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=production nuxt build && wrangler pages dev",
+        "preview:dev": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=development nuxt build --debug --verbose && wrangler pages dev",
+        "postinstall": "nuxt prepare",
+        "deploy": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=production nuxt build && wrangler pages deploy",
+        "deploy:staging": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=staging nuxt build && wrangler pages deploy",
+        "deploy:dev": "cross-env NODE_OPTIONS='--max-old-space-size=8192' CLOUDFLARE_ENV=development nuxt build && wrangler pages deploy",
+        "cf-typegen": "wrangler types"
+    },
+    "dependencies": {
+        "@nuxtjs/supabase": "^1.5.0",
+        "@supabase/supabase-js": "^2.49.4",
+        "google-auth-library": "^9.15.1",
+        "googleapis": "^148.0.0",
+        "nuxt": "^3.16.2",
+        "stream-browserify": "^3.0.0",
+        "util": "^0.12.5",
+        "vue": "^3.5.13",
+        "vue-router": "^4.5.0"
+    },
+    "devDependencies": {
+        "@cloudflare/workers-types": "^4.20250410.0",
+        "@nuxtjs/tailwindcss": "^6.13.2",
+        "cross-env": "^7.0.3",
+        "h3": "^1.15.1",
+        "nitro-cloudflare-dev": "^0.2.2",
+        "wrangler": "^4.9.1"
+    }
 }
